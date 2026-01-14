@@ -14,17 +14,19 @@ describe("addRule - name validation", () => {
   });
 
   it.each([
-    ["path/to/file", "invalid characters"],
     ["path\\file", "invalid characters"],
-    [".hidden", "invalid characters"],
     ["test:name", "invalid characters"],
+    ["path/../file", "invalid characters"],
   ])("should reject name '%s'", async (name, expectedError) => {
     const promise = addRule({ name, source: "test:file.md" });
     await expect(promise).rejects.toThrow(expectedError);
   });
 
-  it("should reject names starting with dash", async () => {
-    const promise = addRule({ name: "-flag", source: "test:file.md" });
-    await expect(promise).rejects.toThrow('cannot start with "-"');
+  it.each([
+    [".hidden", 'cannot start with "."'],
+    ["-flag", 'cannot start with "-"'],
+  ])("should reject name '%s' starting with special char", async (name, expectedError) => {
+    const promise = addRule({ name, source: "test:file.md" });
+    await expect(promise).rejects.toThrow(expectedError);
   });
 });

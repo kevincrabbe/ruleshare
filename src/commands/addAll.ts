@@ -31,7 +31,7 @@ export async function addAll(args: AddAllArgs): Promise<AddAllResult> {
     ref: resolved.ref,
   });
 
-  const mdFiles = files.filter((f) => f.type === "file" && f.name.endsWith(".md"));
+  const mdFiles = filterMdFiles({ files });
 
   if (mdFiles.length === 0) {
     console.log("No .md files found in source");
@@ -47,6 +47,18 @@ export async function addAll(args: AddAllArgs): Promise<AddAllResult> {
   return { added };
 }
 
+type FilterMdFilesArgs = {
+  files: { name: string; path: string; type: string }[];
+};
+
+function filterMdFiles(args: FilterMdFilesArgs): { name: string; path: string }[] {
+  return args.files.filter((f) => {
+    if (f.type !== "file" || !f.name.endsWith(".md")) return false;
+    const basename = f.path.split("/").pop() || "";
+    return basename.toLowerCase() !== "readme.md";
+  });
+}
+
 type AddFilesArgs = {
   mdFiles: { name: string; path: string }[];
   originalSource: string;
@@ -58,8 +70,7 @@ function addFilesToConfig(args: AddFilesArgs): string[] {
   const added: string[] = [];
 
   for (const file of mdFiles) {
-    const basename = file.path.split("/").pop() || file.path;
-    const name = basename.replace(/\.md$/, "");
+    const name = file.path.replace(/\.md$/, "");
     const ruleSource = buildRuleSource({ originalSource, filePath: file.path });
     config.rules[name] = ruleSource;
     added.push(name);

@@ -47,11 +47,11 @@ function checkNameNotEmpty(args: ValidateNameArgs): void {
 }
 
 function checkNameChars(args: ValidateNameArgs): void {
-  const invalidChars = /[/\\:*?"<>|.]/;
+  const invalidChars = /[\\:*?"<>|]/;
   if (invalidChars.test(args.name) || args.name.includes("..")) {
     throw new Error(
       `Rule name "${args.name}" contains invalid characters. ` +
-        `Avoid: / \\ : * ? " < > | .`
+        `Avoid: \\ : * ? " < > | and ..`
     );
   }
 }

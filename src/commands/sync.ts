@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import {
   readConfig,
   readLock,
@@ -102,6 +102,7 @@ async function attemptSync(args: AttemptSyncArgs): Promise<SyncResult> {
 
   const extension = getExtension({ source: resolved.resolved.path });
   const filePath = join(sharedDir, `${name}${extension}`);
+  await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, content, "utf-8");
 
   lock.rules[name] = { source, sha, updated: new Date().toISOString() };
