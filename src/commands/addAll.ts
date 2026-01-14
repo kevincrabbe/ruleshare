@@ -80,8 +80,8 @@ function buildRuleSource(args: BuildRuleSourceArgs): string {
     return `${originalSource}${filePath}`;
   }
 
-  if (originalSource.includes(":") && !originalSource.includes("/")) {
-    return `${originalSource}/${filePath}`;
+  if (!originalSource.includes(":")) {
+    return `${originalSource}:${filePath}`;
   }
 
   return `${originalSource}/${filePath}`;
