@@ -9,7 +9,7 @@ import {
 } from "../config.js";
 import { resolveSource } from "../resolver.js";
 import { fetchContent } from "../fetcher.js";
-import type { SyncResult, SharedLock } from "../types.js";
+import type { SyncResult, SharedLock, SharedConfig } from "../types.js";
 
 type SyncArgs = {
   force?: boolean;
@@ -22,25 +22,49 @@ type SyncOutput = {
 export async function sync(args: SyncArgs = {}): Promise<SyncOutput> {
   const { force = false } = args;
 
-  const config = await readConfig();
-  if (!config) {
-    console.error("No shared.json found. Run `ruleshare init` first.");
+  const config = await loadAndValidateConfig();
+  const ruleEntries = Object.entries(config.rules);
+
+  if (ruleEntries.length === 0) {
+    console.log("No rules configured. Use `ruleshare add` to add rules.");
     return { results: [] };
   }
 
+  console.log("Syncing rules...");
+  const results = await syncAllRules({ ruleEntries, config, force });
+
+  printSummary({ results });
+  return { results };
+}
+
+async function loadAndValidateConfig(): Promise<SharedConfig> {
+  const config = await readConfig();
+  if (!config) {
+    throw new Error("No shared.json found. Run `ruleshare init` first.");
+  }
+  return config;
+}
+
+type SyncAllArgs = {
+  ruleEntries: [string, string][];
+  config: SharedConfig;
+  force: boolean;
+};
+
+async function syncAllRules(args: SyncAllArgs): Promise<SyncResult[]> {
+  const { ruleEntries, config, force } = args;
   const lock = (await readLock()) || createEmptyLock();
   const sharedDir = getSharedDir();
   await mkdir(sharedDir, { recursive: true });
 
   const results: SyncResult[] = [];
-
-  for (const [name, source] of Object.entries(config.rules)) {
-    const result = await syncRule({ name, source, lock, sharedDir, force });
+  for (const [name, source] of ruleEntries) {
+    const result = await syncRule({ name, source, lock, sharedDir, force, config });
     results.push(result);
   }
 
   await writeLock(lock);
-  return { results };
+  return results;
 }
 
 type SyncRuleArgs = {
@@ -49,27 +73,25 @@ type SyncRuleArgs = {
   lock: SharedLock;
   sharedDir: string;
   force: boolean;
+  config: SharedConfig;
 };
 
 async function syncRule(args: SyncRuleArgs): Promise<SyncResult> {
-  const { name, source, lock, sharedDir, force } = args;
-
   try {
-    return await attemptSync({ name, source, lock, sharedDir, force });
+    return await attemptSync(args);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`  ${name}: error - ${message}`);
-    return { name, status: "error", error: message };
+    console.error(`  ${args.name}: error - ${message}`);
+    return { name: args.name, status: "error", error: message };
   }
 }
 
 type AttemptSyncArgs = SyncRuleArgs;
 
 async function attemptSync(args: AttemptSyncArgs): Promise<SyncResult> {
-  const { name, source, lock, sharedDir, force } = args;
+  const { name, source, lock, sharedDir, force, config } = args;
 
-  const config = await readConfig();
-  const resolved = resolveSource({ source, config: config! });
+  const resolved = resolveSource({ source, config });
   const { content, sha } = await fetchContent({ resolved: resolved.resolved });
 
   const existingEntry = lock.rules[name];
@@ -78,7 +100,8 @@ async function attemptSync(args: AttemptSyncArgs): Promise<SyncResult> {
     return { name, status: "unchanged" };
   }
 
-  const filePath = join(sharedDir, `${name}.md`);
+  const extension = getExtension({ source: resolved.resolved.path });
+  const filePath = join(sharedDir, `${name}${extension}`);
   await writeFile(filePath, content, "utf-8");
 
   lock.rules[name] = { source, sha, updated: new Date().toISOString() };
@@ -86,4 +109,37 @@ async function attemptSync(args: AttemptSyncArgs): Promise<SyncResult> {
   const status = existingEntry ? "updated" : "created";
   console.log(`  ${name}: ${status}`);
   return { name, status };
+}
+
+type GetExtensionArgs = {
+  source: string;
+};
+
+function getExtension(args: GetExtensionArgs): string {
+  const { source } = args;
+  const lastDot = source.lastIndexOf(".");
+  if (lastDot === -1 || lastDot < source.lastIndexOf("/")) {
+    return ".md";
+  }
+  return source.substring(lastDot);
+}
+
+type PrintSummaryArgs = {
+  results: SyncResult[];
+};
+
+function printSummary(args: PrintSummaryArgs): void {
+  const { results } = args;
+  const created = results.filter((r) => r.status === "created").length;
+  const updated = results.filter((r) => r.status === "updated").length;
+  const unchanged = results.filter((r) => r.status === "unchanged").length;
+  const errors = results.filter((r) => r.status === "error").length;
+
+  const parts: string[] = [];
+  if (created > 0) parts.push(`${created} created`);
+  if (updated > 0) parts.push(`${updated} updated`);
+  if (unchanged > 0) parts.push(`${unchanged} unchanged`);
+  if (errors > 0) parts.push(`${errors} failed`);
+
+  console.log(`Done: ${parts.join(", ")}`);
 }

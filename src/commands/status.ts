@@ -11,14 +11,12 @@ type StatusOutput = {
 export async function status(): Promise<StatusOutput> {
   const config = await readConfig();
   if (!config) {
-    console.error("No shared.json found. Run `ruleshare init` first.");
-    return { entries: [], hasOutdated: false };
+    throw new Error("No shared.json found. Run `ruleshare init` first.");
   }
 
   const lock = await readLock();
   if (!lock) {
-    console.log("No lock file. Run `ruleshare sync` first.");
-    return { entries: [], hasOutdated: false };
+    throw new Error("No lock file. Run `ruleshare sync` first.");
   }
 
   const entries = await collectStatusEntries({ config, lock });
@@ -104,12 +102,14 @@ async function checkRemoteStatus(args: CheckRemoteArgs): Promise<StatusEntry> {
       isOutdated,
       source,
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`  ${name}: failed to check - ${message}`);
     return {
       name,
       currentSha: lockEntry.sha.substring(0, 8),
       latestSha: "error",
-      isOutdated: false,
+      isOutdated: true,
       source,
     };
   }

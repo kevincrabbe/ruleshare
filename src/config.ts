@@ -25,7 +25,11 @@ export async function readConfig(): Promise<SharedConfig | null> {
     return null;
   }
   const content = await readFile(path, "utf-8");
-  return JSON.parse(content) as SharedConfig;
+  try {
+    return JSON.parse(content) as SharedConfig;
+  } catch {
+    throw new Error(`Invalid JSON in ${path}. Please fix or delete the file.`);
+  }
 }
 
 export async function writeConfig(config: SharedConfig): Promise<void> {
@@ -41,7 +45,11 @@ export async function readLock(): Promise<SharedLock | null> {
     return null;
   }
   const content = await readFile(path, "utf-8");
-  return JSON.parse(content) as SharedLock;
+  try {
+    return JSON.parse(content) as SharedLock;
+  } catch {
+    throw new Error(`Invalid JSON in ${path}. Please fix or delete the file.`);
+  }
 }
 
 export async function writeLock(lock: SharedLock): Promise<void> {

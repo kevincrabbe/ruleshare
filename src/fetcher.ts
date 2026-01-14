@@ -1,8 +1,8 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import type { ResolvedSource, FetchResult } from "./types.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 type FetchArgs = {
   resolved: ResolvedSource;
@@ -103,18 +103,24 @@ async function fetchViaGhCli(args: GhCliFetchArgs): Promise<FetchResult> {
   const apiPath = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
 
   try {
-    const { stdout } = await execAsync(
-      `gh api "${apiPath}" --jq '.content' | base64 -d`
-    );
-    const content = stdout;
+    const { stdout } = await execFileAsync("gh", [
+      "api",
+      apiPath,
+      "--jq",
+      ".content",
+    ]);
+    const content = Buffer.from(stdout.trim(), "base64").toString("utf-8");
     const sha = await computeHash({ content });
     return { content, sha };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const isNotInstalled = message.includes("ENOENT");
+    const hint = isNotInstalled
+      ? "Install GitHub CLI: https://cli.github.com/"
+      : "For private repos, run 'gh auth login' first.";
     throw new Error(
       `Failed to fetch ${owner}/${repo}/${path}. ` +
-        `Ensure the repo exists and you have access. ` +
-        `For private repos, run 'gh auth login' first.\n${message}`
+        `Ensure the repo exists and you have access. ${hint}\n${message}`
     );
   }
 }

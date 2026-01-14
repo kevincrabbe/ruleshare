@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "rules": {
+    "general": {
+      "source": "kc:general.md",
+      "sha": "fbc6ad8774e85a0ac80b76917390b74b315f24d453e0e111ddc0912a87331e1a",
+      "updated": "2026-01-14T06:14:26.400Z"
+    }
+  }
+}

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   init,
   addRule,
@@ -9,6 +12,12 @@ import {
   list,
   remove,
 } from "./commands/index.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8")
+);
+const VERSION = pkg.version as string;
 
 type CommandResult = {
   exitCode: number;
@@ -29,7 +38,11 @@ const commandMap: Record<string, CommandHandler> = {
 };
 
 function isHelpCommand(command: string | undefined): boolean {
-  return !command || command === "help" || command === "--help";
+  return !command || command === "help" || command === "--help" || command === "-h";
+}
+
+function isVersionCommand(command: string | undefined): boolean {
+  return command === "--version" || command === "-v";
 }
 
 async function executeCommand(command: string, args: string[]): Promise<CommandResult> {
@@ -60,11 +73,21 @@ async function main(): Promise<CommandResult> {
     return { exitCode: 0 };
   }
 
+  if (isVersionCommand(command)) {
+    console.log(`ruleshare ${VERSION}`);
+    return { exitCode: 0 };
+  }
+
   return executeCommand(command, args.slice(1));
 }
 
 async function handleAdd(args: string[]): Promise<void> {
-  if (args[0] === "source" && args.length >= 3) {
+  if (args[0] === "source") {
+    if (args.length < 3) {
+      throw new Error(
+        "Usage: ruleshare add source <alias> <github:owner/repo>"
+      );
+    }
     await addSource({ alias: args[1], source: args[2] });
     return;
   }
@@ -74,20 +97,20 @@ async function handleAdd(args: string[]): Promise<void> {
     return;
   }
 
-  console.error("Usage: ruleshare add <name> <source>");
-  console.error("       ruleshare add source <alias> <github:owner/repo>");
+  throw new Error(
+    "Usage: ruleshare add <name> <source>\n" +
+      "       ruleshare add source <alias> <github:owner/repo>"
+  );
 }
 
 async function handleSync(args: string[]): Promise<void> {
   const force = args.includes("--force") || args.includes("-f");
-  console.log("Syncing rules...");
   await sync({ force });
 }
 
 async function handleRemove(args: string[]): Promise<void> {
   if (args.length < 1) {
-    console.error("Usage: ruleshare remove <name>");
-    return;
+    throw new Error("Usage: ruleshare remove <name>");
   }
   await remove({ name: args[0] });
 }

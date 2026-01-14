@@ -19,8 +19,7 @@ type ListOutput = {
 export async function list(): Promise<ListOutput> {
   const config = await readConfig();
   if (!config) {
-    console.log("No shared.json found. Run `ruleshare init` first.");
-    return { rules: [], sources: [] };
+    throw new Error("No shared.json found. Run `ruleshare init` first.");
   }
 
   const lock = await readLock();
@@ -67,7 +66,7 @@ function printRules(args: PrintRulesArgs): void {
 
   console.log("\nRules:");
   for (const { name, source, synced } of rules) {
-    const marker = synced ? "✓" : " ";
+    const marker = synced ? "[x]" : "[ ]";
     console.log(`  ${marker} ${name}: ${source}`);
   }
 }
