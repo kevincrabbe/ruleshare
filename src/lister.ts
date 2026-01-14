@@ -51,5 +51,18 @@ type ParseGhOutputArgs = {
 function parseGhOutput(args: ParseGhOutputArgs): ListFilesResult["files"] {
   const { stdout } = args;
   const lines = stdout.trim().split("\n").filter(Boolean);
-  return lines.map((line) => JSON.parse(line));
+  return lines.map((line) => parseJsonLine({ line }));
+}
+
+type ParseJsonLineArgs = {
+  line: string;
+};
+
+function parseJsonLine(args: ParseJsonLineArgs): ListFilesResult["files"][0] {
+  const { line } = args;
+  try {
+    return JSON.parse(line);
+  } catch {
+    throw new Error(`Invalid response from GitHub API: ${line.substring(0, 100)}`);
+  }
 }

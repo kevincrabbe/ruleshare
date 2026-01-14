@@ -33,7 +33,7 @@ type ValidateNameArgs = {
   name: string;
 };
 
-function validateRuleName(args: ValidateNameArgs): void {
+export function validateRuleName(args: ValidateNameArgs): void {
   const { name } = args;
   checkNameNotEmpty({ name });
   checkNameChars({ name });

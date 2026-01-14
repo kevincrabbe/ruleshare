@@ -3,6 +3,7 @@ import type { ResolvedSource, SharedConfig } from "./types.js";
 type ResolveArgs = {
   source: string;
   config: SharedConfig;
+  visited?: Set<string>;
 };
 
 type ResolveResult = {
@@ -11,7 +12,7 @@ type ResolveResult = {
 };
 
 export function resolveSource(args: ResolveArgs): ResolveResult {
-  const { source, config } = args;
+  const { source, config, visited = new Set() } = args;
 
   if (source.startsWith("https://") || source.startsWith("http://")) {
     return {
@@ -27,39 +28,45 @@ export function resolveSource(args: ResolveArgs): ResolveResult {
     };
   }
 
-  return resolveAlias({ source, config });
+  return resolveAlias({ source, config, visited });
 }
 
 type ResolveAliasArgs = {
   source: string;
   config: SharedConfig;
+  visited: Set<string>;
 };
 
 function resolveAlias(args: ResolveAliasArgs): ResolveResult {
-  const { source, config } = args;
+  const { source, config, visited } = args;
 
-  const bareAlias = tryResolveBareAlias({ source, config });
+  const bareAlias = tryResolveBareAlias({ source, config, visited });
   if (bareAlias) {
     return bareAlias;
   }
 
-  return resolveAliasWithPath({ source, config });
+  return resolveAliasWithPath({ source, config, visited });
 }
 
 function tryResolveBareAlias(args: ResolveAliasArgs): ResolveResult | null {
-  const { source, config } = args;
+  const { source, config, visited } = args;
 
   if (!config.sources?.[source]) {
     return null;
   }
 
+  if (visited.has(source)) {
+    throw new Error(`Circular alias detected: ${source}`);
+  }
+  visited.add(source);
+
   const baseSource = config.sources[source];
-  const result = resolveSource({ source: baseSource, config });
+  const result = resolveSource({ source: baseSource, config, visited });
   return { resolved: result.resolved, originalSource: source };
 }
 
 function resolveAliasWithPath(args: ResolveAliasArgs): ResolveResult {
-  const { source, config } = args;
+  const { source, config, visited } = args;
 
   const aliasMatch = source.match(/^([^:]+):(.*)$/);
   const hasAlias = aliasMatch && config.sources?.[aliasMatch[1]];
@@ -69,16 +76,21 @@ function resolveAliasWithPath(args: ResolveAliasArgs): ResolveResult {
   }
 
   const alias = aliasMatch[1];
+  if (visited.has(alias)) {
+    throw new Error(`Circular alias detected: ${alias}`);
+  }
+  visited.add(alias);
+
   const filePath = aliasMatch[2];
   const baseSource = config.sources![alias];
 
   if (!filePath) {
-    const result = resolveSource({ source: baseSource, config });
+    const result = resolveSource({ source: baseSource, config, visited });
     return { resolved: result.resolved, originalSource: source };
   }
 
   const combined = combineSourceAndPath({ baseSource, filePath });
-  const result = resolveSource({ source: combined, config });
+  const result = resolveSource({ source: combined, config, visited });
   return { resolved: result.resolved, originalSource: source };
 }
 
@@ -117,16 +129,34 @@ type ExtractRefResult = {
 function extractRef(args: ExtractRefArgs): ExtractRefResult {
   const { source } = args;
   const atIndex = source.lastIndexOf("@");
-  const hasRef = atIndex > 0 && !source.substring(atIndex).includes("/");
+  const noSlashAfterAt = atIndex > 0 && !source.substring(atIndex).includes("/");
 
-  if (!hasRef) {
+  if (!noSlashAfterAt) {
+    return { ref: undefined, pathPart: source };
+  }
+
+  const pathBeforeAt = source.substring(0, atIndex);
+  const hasExtensionBeforeAt = hasFileExtension({ path: pathBeforeAt });
+
+  if (!hasExtensionBeforeAt) {
     return { ref: undefined, pathPart: source };
   }
 
   return {
     ref: source.substring(atIndex + 1),
-    pathPart: source.substring(0, atIndex),
+    pathPart: pathBeforeAt,
   };
+}
+
+type HasExtensionArgs = {
+  path: string;
+};
+
+function hasFileExtension(args: HasExtensionArgs): boolean {
+  const { path } = args;
+  const lastSlash = path.lastIndexOf("/");
+  const lastDot = path.lastIndexOf(".");
+  return lastDot > lastSlash && lastDot < path.length - 1;
 }
 
 type CombineArgs = {

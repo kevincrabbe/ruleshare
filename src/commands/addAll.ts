@@ -1,6 +1,7 @@
 import { readConfig, writeConfig, createEmptyConfig } from "../config.js";
 import { listFiles } from "../lister.js";
 import { resolveSource } from "../resolver.js";
+import { validateRuleName } from "./add.js";
 
 type AddAllArgs = {
   source: string;
@@ -38,7 +39,8 @@ export async function addAll(args: AddAllArgs): Promise<AddAllResult> {
     return { added: [] };
   }
 
-  const added = addFilesToConfig({ mdFiles, originalSource, config });
+  const basePath = resolved.path || "";
+  const added = addFilesToConfig({ mdFiles, originalSource, basePath, config });
   await writeConfig(config);
 
   console.log(`Added ${added.length} rules:`);
@@ -62,21 +64,57 @@ function filterMdFiles(args: FilterMdFilesArgs): { name: string; path: string }[
 type AddFilesArgs = {
   mdFiles: { name: string; path: string }[];
   originalSource: string;
+  basePath: string;
   config: { rules: Record<string, string> };
 };
 
 function addFilesToConfig(args: AddFilesArgs): string[] {
-  const { mdFiles, originalSource, config } = args;
+  const { mdFiles, originalSource, basePath, config } = args;
   const added: string[] = [];
 
   for (const file of mdFiles) {
     const name = file.path.replace(/\.md$/, "");
-    const ruleSource = buildRuleSource({ originalSource, filePath: file.path });
+    if (!isValidRuleName({ name })) {
+      console.warn(`  Skipping "${name}": invalid rule name`);
+      continue;
+    }
+    const relativePath = getRelativePath({ fullPath: file.path, basePath });
+    const ruleSource = buildRuleSource({ originalSource, filePath: relativePath });
     config.rules[name] = ruleSource;
     added.push(name);
   }
 
   return added;
+}
+
+type IsValidArgs = {
+  name: string;
+};
+
+function isValidRuleName(args: IsValidArgs): boolean {
+  try {
+    validateRuleName(args);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type GetRelativePathArgs = {
+  fullPath: string;
+  basePath: string;
+};
+
+function getRelativePath(args: GetRelativePathArgs): string {
+  const { fullPath, basePath } = args;
+  if (!basePath) {
+    return fullPath;
+  }
+  const prefix = basePath + "/";
+  if (fullPath.startsWith(prefix)) {
+    return fullPath.substring(prefix.length);
+  }
+  return fullPath;
 }
 
 type BuildRuleSourceArgs = {

@@ -8,6 +8,7 @@ import {
   writeLock,
   getSharedDir,
 } from "../config.js";
+import { resolveSource } from "../resolver.js";
 
 type RemoveArgs = {
   name: string;
@@ -40,7 +41,8 @@ export async function remove(args: RemoveArgs): Promise<RemoveResult> {
     await writeLock(lock);
   }
 
-  const extension = getExtension({ source });
+  const { resolved } = resolveSource({ source, config });
+  const extension = getExtension({ path: resolved.path });
   const filePath = join(getSharedDir(), `${name}${extension}`);
   if (existsSync(filePath)) {
     await unlink(filePath);
@@ -51,18 +53,14 @@ export async function remove(args: RemoveArgs): Promise<RemoveResult> {
 }
 
 type GetExtensionArgs = {
-  source: string;
+  path: string;
 };
 
 function getExtension(args: GetExtensionArgs): string {
-  const { source } = args;
-  const lastDot = source.lastIndexOf(".");
-  const lastSlash = source.lastIndexOf("/");
-  const lastAt = source.lastIndexOf("@");
-  const pathEnd = lastAt > lastSlash ? lastAt : source.length;
-  const dotInPath = lastDot > lastSlash && lastDot < pathEnd;
-  if (!dotInPath) {
+  const { path } = args;
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1 || lastDot < path.lastIndexOf("/")) {
     return ".md";
   }
-  return source.substring(lastDot, pathEnd);
+  return path.substring(lastDot);
 }
