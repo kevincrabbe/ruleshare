@@ -123,6 +123,16 @@ ruleshare remove typescript
 | Alias | `alias:path/file.md` |
 | URL | `https://example.com/rules.md` |
 
+## Private Repos
+
+Private GitHub repos work automatically if you have the [GitHub CLI](https://cli.github.com/) authenticated:
+
+```bash
+gh auth login
+```
+
+No additional configuration needed. Ruleshare tries unauthenticated access first, then falls back to `gh` for private repos.
+
 ## License
 
 MIT
