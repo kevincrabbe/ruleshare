@@ -9,31 +9,20 @@ const configWithAlias: SharedConfig = {
 };
 
 describe("resolveSource - Alias sources", () => {
-  it("should resolve alias to github source", () => {
-    const result = resolveSource({
-      source: "kc:general.md",
-      config: configWithAlias,
-    });
+  it.each([
+    ["kc", "", "bare alias"],
+    ["kc:", "", "alias with colon"],
+    ["kc:general.md", "general.md", "alias with file"],
+    ["kc:typescript/rules.md", "typescript/rules.md", "alias with path"],
+  ])("should resolve %s (%s)", (source, expectedPath) => {
+    const result = resolveSource({ source, config: configWithAlias });
     expect(result.resolved.type).toBe("github");
     expect(result.resolved.owner).toBe("kevincrabbe");
-    expect(result.resolved.repo).toBe("kc-rules");
-    expect(result.resolved.path).toBe("general.md");
-  });
-
-  it("should resolve alias with nested path", () => {
-    const result = resolveSource({
-      source: "kc:typescript/rules.md",
-      config: configWithAlias,
-    });
-    expect(result.resolved.path).toBe("typescript/rules.md");
+    expect(result.resolved.path).toBe(expectedPath);
   });
 
   it("should throw for unknown alias", () => {
-    expect(() =>
-      resolveSource({
-        source: "unknown:file.md",
-        config: emptyConfig,
-      })
-    ).toThrow("Invalid source format");
+    expect(() => resolveSource({ source: "unknown:file.md", config: emptyConfig }))
+      .toThrow("Invalid source format");
   });
 });

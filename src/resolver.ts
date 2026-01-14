@@ -38,6 +38,29 @@ type ResolveAliasArgs = {
 function resolveAlias(args: ResolveAliasArgs): ResolveResult {
   const { source, config } = args;
 
+  const bareAlias = tryResolveBareAlias({ source, config });
+  if (bareAlias) {
+    return bareAlias;
+  }
+
+  return resolveAliasWithPath({ source, config });
+}
+
+function tryResolveBareAlias(args: ResolveAliasArgs): ResolveResult | null {
+  const { source, config } = args;
+
+  if (!config.sources?.[source]) {
+    return null;
+  }
+
+  const baseSource = config.sources[source];
+  const result = resolveSource({ source: baseSource, config });
+  return { resolved: result.resolved, originalSource: source };
+}
+
+function resolveAliasWithPath(args: ResolveAliasArgs): ResolveResult {
+  const { source, config } = args;
+
   const aliasMatch = source.match(/^([^:]+):(.*)$/);
   const hasAlias = aliasMatch && config.sources?.[aliasMatch[1]];
 
