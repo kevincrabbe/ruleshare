@@ -25,10 +25,20 @@ describe("resolveSource - GitHub sources", () => {
     expect(result.resolved.path).toBe("file.md");
   });
 
-  it("should throw for invalid github path", () => {
+  it("should allow github source without file path", () => {
+    const result = resolveSource({
+      source: "github:owner/repo",
+      config: emptyConfig,
+    });
+    expect(result.resolved.owner).toBe("owner");
+    expect(result.resolved.repo).toBe("repo");
+    expect(result.resolved.path).toBe("");
+  });
+
+  it("should throw for invalid github source missing repo", () => {
     expect(() =>
       resolveSource({
-        source: "github:owner/repo",
+        source: "github:owner",
         config: emptyConfig,
       })
     ).toThrow("Invalid GitHub source");

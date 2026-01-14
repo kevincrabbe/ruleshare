@@ -1,6 +1,6 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import type { ResolvedSource, FetchResult } from "./types.js";
+import type { ResolvedSource, FetchResult, ListFilesResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -154,4 +154,40 @@ export async function checkForUpdate(
   const { resolved, currentSha } = args;
   const { sha: latestSha } = await fetchContent({ resolved });
   return { isOutdated: currentSha !== latestSha, latestSha };
+}
+
+type ListFilesArgs = {
+  owner: string;
+  repo: string;
+  path?: string;
+  ref?: string;
+};
+
+export async function listFiles(args: ListFilesArgs): Promise<ListFilesResult> {
+  const { owner, repo, path = "", ref = "main" } = args;
+  const apiPath = `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
+
+  try {
+    const { stdout } = await execFileAsync("gh", [
+      "api",
+      apiPath,
+      "--jq",
+      ".[] | {name, path, type}",
+    ]);
+    const files = parseGhOutput({ stdout });
+    return { files };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to list files from ${owner}/${repo}. ${message}`);
+  }
+}
+
+type ParseGhOutputArgs = {
+  stdout: string;
+};
+
+function parseGhOutput(args: ParseGhOutputArgs): ListFilesResult["files"] {
+  const { stdout } = args;
+  const lines = stdout.trim().split("\n").filter(Boolean);
+  return lines.map((line) => JSON.parse(line));
 }

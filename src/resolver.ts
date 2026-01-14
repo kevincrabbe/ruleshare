@@ -7,17 +7,24 @@ type ResolveArgs = {
 
 type ResolveResult = {
   resolved: ResolvedSource;
+  originalSource: string;
 };
 
 export function resolveSource(args: ResolveArgs): ResolveResult {
   const { source, config } = args;
 
   if (source.startsWith("https://") || source.startsWith("http://")) {
-    return { resolved: { type: "url", path: source, url: source } };
+    return {
+      resolved: { type: "url", path: source, url: source },
+      originalSource: source,
+    };
   }
 
   if (source.startsWith("github:")) {
-    return { resolved: parseGitHubSource({ source }) };
+    return {
+      resolved: parseGitHubSource({ source }),
+      originalSource: source,
+    };
   }
 
   return resolveAlias({ source, config });
@@ -31,7 +38,7 @@ type ResolveAliasArgs = {
 function resolveAlias(args: ResolveAliasArgs): ResolveResult {
   const { source, config } = args;
 
-  const aliasMatch = source.match(/^([^:]+):(.+)$/);
+  const aliasMatch = source.match(/^([^:]+):(.*)$/);
   const hasAlias = aliasMatch && config.sources?.[aliasMatch[1]];
 
   if (!hasAlias) {
@@ -41,9 +48,15 @@ function resolveAlias(args: ResolveAliasArgs): ResolveResult {
   const alias = aliasMatch[1];
   const filePath = aliasMatch[2];
   const baseSource = config.sources![alias];
-  const combined = combineSourceAndPath({ baseSource, filePath });
 
-  return resolveSource({ source: combined, config });
+  if (!filePath) {
+    const result = resolveSource({ source: baseSource, config });
+    return { resolved: result.resolved, originalSource: source };
+  }
+
+  const combined = combineSourceAndPath({ baseSource, filePath });
+  const result = resolveSource({ source: combined, config });
+  return { resolved: result.resolved, originalSource: source };
 }
 
 type ParseGitHubArgs = {
@@ -56,7 +69,7 @@ function parseGitHubSource(args: ParseGitHubArgs): ResolvedSource {
   const { ref, pathPart } = extractRef({ source: withoutPrefix });
 
   const parts = pathPart.split("/");
-  if (parts.length < 3) {
+  if (parts.length < 2) {
     throw new Error(`Invalid GitHub source: ${source}`);
   }
 
@@ -64,7 +77,7 @@ function parseGitHubSource(args: ParseGitHubArgs): ResolvedSource {
     type: "github",
     owner: parts[0],
     repo: parts[1],
-    path: parts.slice(2).join("/"),
+    path: parts.length > 2 ? parts.slice(2).join("/") : "",
     ref,
   };
 }

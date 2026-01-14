@@ -7,6 +7,7 @@ import {
   init,
   addRule,
   addSource,
+  addAll,
   sync,
   status,
   list,
@@ -28,6 +29,7 @@ type CommandHandler = (args: string[]) => Promise<void>;
 const commandMap: Record<string, CommandHandler> = {
   init: async () => { await init(); },
   add: handleAdd,
+  "add-all": handleAddAll,
   sync: handleSync,
   update: async () => { await sync({ force: true }); },
   status: async () => { await status(); },
@@ -115,6 +117,13 @@ async function handleRemove(args: string[]): Promise<void> {
   await remove({ name: args[0] });
 }
 
+async function handleAddAll(args: string[]): Promise<void> {
+  if (args.length < 1) {
+    throw new Error("Usage: ruleshare add-all <source>");
+  }
+  await addAll({ source: args[0] });
+}
+
 function printHelp(): void {
   console.log(`
 ruleshare - Sync Claude Code rules from remote sources
@@ -126,6 +135,7 @@ Commands:
   init                          Create shared.json config file
   add <name> <source>           Add a rule
   add source <alias> <source>   Add a source alias
+  add-all <source>              Add all .md files from a source
   sync [--force]                Download rules to .claude/rules/shared/
   update                        Force update all rules
   status                        Check for outdated rules
@@ -134,8 +144,9 @@ Commands:
 
 Examples:
   ruleshare init
-  ruleshare add source anthropic github:anthropic/claude-rules
-  ruleshare add typescript anthropic:typescript.md
+  ruleshare add source kc github:kevincrabbe/kc-rules
+  ruleshare add typescript kc:typescript.md
+  ruleshare add-all kc:
   ruleshare sync
 `);
 }

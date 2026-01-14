@@ -42,3 +42,13 @@ export type StatusEntry = {
   isOutdated: boolean;
   source: string;
 };
+
+export type GitHubFile = {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+};
+
+export type ListFilesResult = {
+  files: GitHubFile[];
+};
