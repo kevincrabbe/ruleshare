@@ -1,5 +1,5 @@
 import { readConfig, writeConfig, createEmptyConfig } from "../config.js";
-import { listFiles } from "../fetcher.js";
+import { listFiles } from "../lister.js";
 import { resolveSource } from "../resolver.js";
 
 type AddAllArgs = {
@@ -58,8 +58,9 @@ function addFilesToConfig(args: AddFilesArgs): string[] {
   const added: string[] = [];
 
   for (const file of mdFiles) {
-    const name = file.name.replace(/\.md$/, "");
-    const ruleSource = buildRuleSource({ originalSource, fileName: file.name });
+    const basename = file.path.split("/").pop() || file.path;
+    const name = basename.replace(/\.md$/, "");
+    const ruleSource = buildRuleSource({ originalSource, filePath: file.path });
     config.rules[name] = ruleSource;
     added.push(name);
   }
@@ -69,19 +70,19 @@ function addFilesToConfig(args: AddFilesArgs): string[] {
 
 type BuildRuleSourceArgs = {
   originalSource: string;
-  fileName: string;
+  filePath: string;
 };
 
 function buildRuleSource(args: BuildRuleSourceArgs): string {
-  const { originalSource, fileName } = args;
+  const { originalSource, filePath } = args;
 
   if (originalSource.endsWith(":")) {
-    return `${originalSource}${fileName}`;
+    return `${originalSource}${filePath}`;
   }
 
   if (originalSource.includes(":") && !originalSource.includes("/")) {
-    return `${originalSource}/${fileName}`;
+    return `${originalSource}/${filePath}`;
   }
 
-  return `${originalSource}/${fileName}`;
+  return `${originalSource}/${filePath}`;
 }
