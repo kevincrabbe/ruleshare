@@ -1,4 +1,8 @@
+import { exec } from "child_process";
+import { promisify } from "util";
 import type { ResolvedSource, FetchResult } from "./types.js";
+
+const execAsync = promisify(exec);
 
 type FetchArgs = {
   resolved: ResolvedSource;
@@ -40,28 +44,79 @@ async function fetchFromGitHub(args: FetchGitHubArgs): Promise<FetchResult> {
   const { resolved } = args;
   const { owner, repo, path, ref } = resolved;
 
+  if (!owner || !repo) {
+    throw new Error("GitHub source requires owner and repo");
+  }
+
   const branch = ref || "main";
+
+  const publicResult = await tryPublicFetch({ owner, repo, path, branch });
+  if (publicResult) {
+    return publicResult;
+  }
+
+  return fetchViaGhCli({ owner, repo, path, branch });
+}
+
+type TryPublicFetchArgs = {
+  owner: string;
+  repo: string;
+  path: string;
+  branch: string;
+};
+
+async function tryPublicFetch(
+  args: TryPublicFetchArgs
+): Promise<FetchResult | null> {
+  const { owner, repo, path, branch } = args;
   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
 
   const response = await fetch(url);
-
-  if (!response.ok) {
-    const fallbackUrl = url.replace("/main/", "/master/");
-    const fallbackResponse = await fetch(fallbackUrl);
-
-    if (!fallbackResponse.ok) {
-      throw new Error(`Failed to fetch from GitHub: ${response.statusText}`);
-    }
-
-    const content = await fallbackResponse.text();
+  if (response.ok) {
+    const content = await response.text();
     const sha = await computeHash({ content });
     return { content, sha };
   }
 
-  const content = await response.text();
-  const sha = await computeHash({ content });
+  if (branch === "main") {
+    const masterUrl = url.replace("/main/", "/master/");
+    const masterResponse = await fetch(masterUrl);
+    if (masterResponse.ok) {
+      const content = await masterResponse.text();
+      const sha = await computeHash({ content });
+      return { content, sha };
+    }
+  }
 
-  return { content, sha };
+  return null;
+}
+
+type GhCliFetchArgs = {
+  owner: string;
+  repo: string;
+  path: string;
+  branch: string;
+};
+
+async function fetchViaGhCli(args: GhCliFetchArgs): Promise<FetchResult> {
+  const { owner, repo, path, branch } = args;
+  const apiPath = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+
+  try {
+    const { stdout } = await execAsync(
+      `gh api "${apiPath}" --jq '.content' | base64 -d`
+    );
+    const content = stdout;
+    const sha = await computeHash({ content });
+    return { content, sha };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to fetch ${owner}/${repo}/${path}. ` +
+        `Ensure the repo exists and you have access. ` +
+        `For private repos, run 'gh auth login' first.\n${message}`
+    );
+  }
 }
 
 type HashArgs = {
