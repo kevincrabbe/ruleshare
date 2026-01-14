@@ -1,8 +1,0 @@
-{
-  "sources": {
-    "kc": "github:kevincrabbe/kc-rules"
-  },
-  "rules": {
-    "general": "kc:general.md"
-  }
-}
