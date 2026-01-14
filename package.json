@@ -1,6 +1,6 @@
 {
   "name": "ruleshare",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Sync shared Claude Code rules from remote sources",
   "type": "module",
   "bin": {
