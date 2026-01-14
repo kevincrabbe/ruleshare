@@ -15,6 +15,13 @@ export default tseslint.config(
     },
   },
   {
+    files: ["**/*.test.ts"],
+    rules: {
+      "max-lines-per-function": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+    },
+  },
+  {
     ignores: ["dist/**", "node_modules/**"],
   }
 );
